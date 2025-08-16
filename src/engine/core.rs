@@ -77,9 +77,3 @@ pub fn resolve_solo(
         },
     )
 }
-
-/// Dla QTE – policz „elapsed_ms” względem startu
-pub fn elapsed_ms(start: std::time::Instant) -> i32 {
-    let d = start.elapsed();
-    (d.as_millis() as i32).clamp(0, 10_000)
-}

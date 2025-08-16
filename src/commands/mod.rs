@@ -7,3 +7,4 @@ pub mod balance;
 pub  mod pay;
 pub mod admcontrol;
 pub mod shop_ui;
+pub mod subscribers;
