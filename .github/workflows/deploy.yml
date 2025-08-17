@@ -1,0 +1,53 @@
+name: Build & Deploy TigrisSystem
+
+on:
+  push:
+    branches: [ "main" ]   # jeśli używasz "master", podmień na master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      # ZBUDUJ BINARKĘ. Jeśli Twoja binarka nazywa się inaczej,
+      # zmień wszystkie wystąpienia "tigris-system" na swoją nazwę.
+      - name: Build release
+        run: |
+          cargo build --release --bin tigris-system
+          ls -l target/release/tigris-system
+
+      # SKOPIUJ NA SERWER (do /tmp). Wymaga sekretów (patrz niżej).
+      - name: Upload binary to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "target/release/tigris-system"
+          target: "/tmp"
+          overwrite: true
+
+      # PRZEŁĄCZ SYMLINK 'current' → nowy release i ZRESTARTUJ usługę
+      - name: Switch release & restart service
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            STAMP=$(date +%Y%m%d-%H%M%S)-$GITHUB_SHA
+            install -d -m 0755 -o tigrissystem -g tigrissystem /opt/tigris-system/releases/$STAMP
+            install -m 0755 -o tigrissystem -g tigrissystem /tmp/tigris-system /opt/tigris-system/releases/$STAMP/tigris-system
+            ln -sfn /opt/tigris-system/releases/$STAMP /opt/tigris-system/current
+            sudo systemctl restart tigris_system.service
+            sudo systemctl --no-pager --full status tigris_system.service || true
