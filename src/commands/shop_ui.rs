@@ -33,13 +33,21 @@ struct ShopConfig {
 
 static CONFIG: SyncOnceCell<ShopConfig> = SyncOnceCell::new();
 
+fn required_env_u64(keys: &[&str]) -> u64 {
+    for k in keys {
+        if let Ok(v) = env::var(k) {
+            return v.parse::<u64>()
+                .unwrap_or_else(|_| panic!("Invalid value for {}='{}' (expected u64 Discord ID)", k, v));
+        }
+    }
+    panic!("Missing required env var: set one of {:?}", keys);
+}
+
 fn config() -> &'static ShopConfig {
     CONFIG.get_or_init(|| {
-        let role_id = env::var("SHOP_ROLE_ID")
-            .ok()
-            .and_then(|s| s.parse::<u64>().ok())
-            .map(RoleId::new)
-            .unwrap_or_else(|| RoleId::new(1406257723774861416));
+        // Wyłącznie z ENV (bez fallbacku liczbowego w kodzie).
+        // Możesz zostawić tylko "ID_TIGRIS_ROLE" jeśli chcesz jednoznaczną nazwę.
+        let role_id = RoleId::new(required_env_u64(&["ID_TIGRIS_ROLE", "SHOP_ROLE_ID", "TIGRIS_ROLE_ID"]));
 
         let log_channel = env::var("LOG_CHANNEL_ID")
             .ok()
@@ -50,7 +58,7 @@ fn config() -> &'static ShopConfig {
         let price_tk = env::var("ROLE_PRICE_TK")
             .ok()
             .and_then(|s| s.parse::<i64>().ok())
-            .unwrap_or(20_000);
+            .unwrap_or(20_000); // cenę możesz zostawić opcjonalną
 
         ShopConfig {
             role_id,
